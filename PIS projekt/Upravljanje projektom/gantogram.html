@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gantogram Projekta - RxPMS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-bg: #f8f9fa;
+            --color-text: #343a40;
+            --color-border: #dee2e6;
+            --color-header-bg: #e9ecef;
+            --color-phase: #a5d8ff; /* Svijetlo plava za faze */
+            --color-phase-border: #4dabf7;
+            --color-task: #99e9f2;  /* Svijetlo tirkizna za zadatke */
+            --color-task-border: #22b8cf;
+            --color-milestone: #f06595;
+            --font-family: 'Inter', sans-serif;
+            --total-weeks: 44; 
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            margin: 0;
+            padding: 2rem;
+        }
+
+        .gantt-container {
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            background-color: var(--color-header-bg);
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        header h1 {
+            text-align: center;
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        #view-toggle {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--color-border);
+            border-radius: 6px;
+            background-color: #fff;
+            cursor: pointer;
+            font-family: var(--font-family);
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        #view-toggle:hover {
+            background-color: #f1f3f5;
+        }
+
+        .gantt-chart-wrapper {
+             overflow-x: auto;
+        }
+
+        .gantt-chart {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            width: 100%;
+        }
+
+        .gantt-chart.view-weeks {
+            min-width: 1800px;
+        }
+
+        .gantt-chart.view-months {
+            min-width: 1000px;
+        }
+        
+        .gantt-header, .gantt-row {
+            display: contents; 
+        }
+
+        .gantt-header-tasks, .gantt-header-timeline {
+            background-color: var(--color-header-bg);
+            font-weight: 700;
+            padding: 0.75rem;
+            text-align: center;
+            border-bottom: 1px solid var(--color-border);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .gantt-header-tasks {
+            border-right: 1px solid var(--color-border);
+        }
+
+        .gantt-timeline-header {
+            display: grid;
+        }
+        
+        .gantt-timeline-header .timeline-unit {
+            text-align: center;
+            border-right: 1px solid var(--color-border);
+            font-size: 0.8rem;
+            padding: 0.5rem 0;
+            font-weight: 500;
+        }
+        
+        .gantt-timeline-header .timeline-unit:last-child {
+            border-right: none;
+        }
+
+        .gantt-task-name, .gantt-task-timeline {
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--color-border);
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .gantt-task-name {
+            border-right: 1px solid var(--color-border);
+        }
+
+        .task-phase {
+            font-weight: 700;
+            background-color: #f1f3f5;
+        }
+        
+        .task-sub {
+            padding-left: 2rem !important;
+        }
+
+        .gantt-task-timeline {
+            position: relative;
+        }
+
+        .timeline-grid {
+             position: absolute;
+             top: 0;
+             left: 0;
+             width: 100%;
+             height: 100%;
+             display: grid;
+             z-index: 0;
+        }
+        .timeline-grid-line {
+            border-right: 1px dotted var(--color-border);
+        }
+        .timeline-grid-line:last-child {
+            border-right: none;
+        }
+
+        .gantt-bar {
+            position: absolute;
+            height: 60%;
+            border-radius: 4px;
+            box-sizing: border-box;
+            overflow: hidden;
+            z-index: 1;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            padding: 0 0.5rem;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            color: #111;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .gantt-bar:hover {
+            transform: scale(1.02);
+            z-index: 5;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .bar-phase {
+            background-color: var(--color-phase);
+            border: 1px solid var(--color-phase-border);
+        }
+
+        .bar-task {
+            background-color: var(--color-task);
+            border: 1px solid var(--color-task-border);
+        }
+        
+        .bar-milestone {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%) rotate(45deg);
+            width: 16px;
+            height: 16px;
+            background-color: var(--color-milestone);
+            border: 1px solid #c2255c;
+            z-index: 2;
+        }
+        .bar-milestone:hover .milestone-tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+        .milestone-tooltip {
+            opacity: 0;
+            visibility: hidden;
+            position: absolute;
+            bottom: 120%;
+            left: 50%;
+            transform: translateX(-50%) rotate(-45deg);
+            background-color: #333;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            transition: opacity 0.2s;
+        }
+        
+        @media (max-width: 768px) {
+            body { padding: 0; }
+            .gantt-container { border-radius: 0; box-shadow: none; }
+            .gantt-chart { grid-template-columns: 150px 1fr; }
+            .gantt-task-name, .gantt-header-tasks { padding: 0.5rem; font-size: 0.75rem; }
+        }
+
+    </style>
+</head>
+<body>
+    <div class="gantt-container">
+        <header>
+            <h1>Gantogram Projekta - RxPMS</h1>
+            <button id="view-toggle">Prikaži tjedni pregled</button>
+        </header>
+
+        <div class="gantt-chart-wrapper">
+            <div class="gantt-chart" id="gantt-chart">
+                <!-- Sadržaj se generira JavaScriptom -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const projectData = [
+            // Faza 1
+            { id: 1, name: 'Faza 1: Inicijacija i Planiranje', start: 1, duration: 5, type: 'phase' },
+            { id: 1.1, name: 'Izrada Prijedloga Projekta', start: 1, duration: 1, type: 'task' },
+            { id: 1.2, name: 'Definiranje opsega projekta', start: 2, duration: 1, type: 'task' },
+            { id: 1.3, name: 'Izrada Plana Projekta', start: 3, duration: 2, type: 'task' },
+            { id: 1.4, name: 'Formiranje projektnog tima', start: 5, duration: 1, type: 'task' },
+            { id: 'F1', name: 'Kraj Faze 1', start: 6, type: 'milestone' },
+            
+            // Faza 2
+            { id: 2, name: 'Faza 2: Analiza Zahtjeva', start: 6, duration: 4, type: 'phase' },
+            { id: 2.1, name: 'Prikupljanje zahtjeva', start: 6, duration: 2, type: 'task' },
+            { id: 2.2, name: 'Izrada Specifikacije Zahtjeva', start: 8, duration: 2, type: 'task' },
+            { id: 2.3, name: 'Validacija zahtjeva', start: 10, duration: 1, type: 'task' },
+            { id: 'F2', name: 'Kraj Faze 2', start: 11, type: 'milestone' },
+            
+            // Faza 3
+            { id: 3, name: 'Faza 3: Dizajn Sustava', start: 11, duration: 6, type: 'phase' },
+            { id: 3.1, name: 'Dizajn arhitekture sustava', start: 11, duration: 2, type: 'task' },
+            { id: 3.2, name: 'Dizajn baze podataka', start: 13, duration: 2, type: 'task' },
+            { id: 3.3, name: 'Dizajn korisničkog sučelja (UI/UX)', start: 13, duration: 3, type: 'task' },
+            { id: 3.4, name: 'Izrada tehničke specifikacije', start: 16, duration: 1, type: 'task' },
+            { id: 'F3', name: 'Kraj Faze 3', start: 17, type: 'milestone' },
+
+            // Faza 4
+            { id: 4, name: 'Faza 4: Razvoj Aplikacije', start: 17, duration: 13, type: 'phase' },
+            { id: 4.1, name: 'Postavljanje okruženja', start: 17, duration: 1, type: 'task' },
+            { id: 4.2, name: 'Razvoj baze podataka', start: 17, duration: 3, type: 'task' },
+            { id: 4.3, name: 'Razvoj Backend-a', start: 20, duration: 8, type: 'task' },
+            { id: 4.4, name: 'Razvoj Frontend-a', start: 20, duration: 8, type: 'task' },
+            { id: 4.5, name: 'Integracija modula', start: 28, duration: 2, type: 'task' },
+            { id: 'F4', name: 'Kraj Faze 4', start: 30, type: 'milestone' },
+
+            // Faza 5
+            { id: 5, name: 'Faza 5: Testiranje', start: 30, duration: 7, type: 'phase' },
+            { id: 5.1, name: 'Integracijsko testiranje', start: 30, duration: 2, type: 'task' },
+            { id: 5.2, name: 'Sustavno testiranje', start: 32, duration: 2, type: 'task' },
+            { id: 5.3, name: 'Korisničko prihvatno testiranje (UAT)', start: 34, duration: 2, type: 'task' },
+            { id: 5.4, name: 'Ispravak grešaka', start: 36, duration: 1, type: 'task' },
+            { id: 'F5', name: 'Kraj Faze 5', start: 37, type: 'milestone' },
+
+            // Faza 6
+            { id: 6, name: 'Faza 6: Implementacija', start: 37, duration: 3, type: 'phase' },
+            { id: 6.1, name: 'Priprema produkcije', start: 37, duration: 1, type: 'task' },
+            { id: 6.2, name: 'Migracija podataka', start: 38, duration: 1, type: 'task' },
+            { id: 6.3, name: 'Instalacija (Go-live)', start: 39, duration: 1, type: 'task' },
+            { id: 'F6', name: 'Kraj Faze 6', start: 40, type: 'milestone' },
+
+            // Faza 7
+            { id: 7, name: 'Faza 7: Obuka i Podrška', start: 39, duration: 5, type: 'phase' },
+            { id: 7.1, name: 'Obuka korisnika', start: 39, duration: 1, type: 'task' },
+            { id: 7.2, name: 'Početna podrška korisnicima', start: 40, duration: 2, type: 'task' },
+            { id: 7.3, name: 'Finalizacija dokumentacije', start: 42, duration: 1, type: 'task' },
+            { id: 7.4, name: 'Završna analiza projekta', start: 43, duration: 1, type: 'task' }
+        ];
+        
+        const totalWeeks = Math.max(...projectData.map(t => t.start + (t.duration || 1))) - 1;
+        const months = [
+            { name: 'Lipanj \'25', weeks: 4 }, { name: 'Srpanj', weeks: 4 }, { name: 'Kolovoz', weeks: 4 },
+            { name: 'Rujan', weeks: 4 }, { name: 'Listopad', weeks: 5 }, { name: 'Studeni', weeks: 4 },
+            { name: 'Prosinac', weeks: 4 }, { name: 'Siječanj \'26', weeks: 4 }, { name: 'Veljača', weeks: 4 },
+            { name: 'Ožujak', weeks: 5 }, { name: 'Travanj', weeks: 2 }
+        ];
+
+        let currentView = 'months'; // Zadana vrijednost
+
+        function renderChart(view) {
+            const ganttChart = document.getElementById('gantt-chart');
+            ganttChart.innerHTML = ''; // Očisti prethodni sadržaj
+            ganttChart.className = 'gantt-chart'; // Resetiraj klase
+            ganttChart.classList.add(view === 'weeks' ? 'view-weeks' : 'view-months');
+
+            // -- RENDER HEADER --
+            const header = document.createElement('div');
+            header.className = 'gantt-header';
+            
+            const timelineHeaderUnits = document.createElement('div');
+            timelineHeaderUnits.className = 'gantt-timeline-header';
+
+            if (view === 'weeks') {
+                timelineHeaderUnits.style.gridTemplateColumns = `repeat(${totalWeeks}, 1fr)`;
+                for (let i = 1; i <= totalWeeks; i++) {
+                    timelineHeaderUnits.innerHTML += `<div class="timeline-unit">${i}</div>`;
+                }
+            } else { // months
+                timelineHeaderUnits.style.gridTemplateColumns = months.map(m => `${m.weeks}fr`).join(' ');
+                 months.forEach(month => {
+                    timelineHeaderUnits.innerHTML += `<div class="timeline-unit">${month.name}</div>`;
+                });
+            }
+
+            header.innerHTML = `
+                <div class="gantt-header-tasks">Zadatak</div>
+                <div class="gantt-header-timeline">
+                    ${timelineHeaderUnits.outerHTML}
+                </div>
+            `;
+            ganttChart.appendChild(header);
+
+
+            // -- RENDER ROWS --
+            projectData.forEach(task => {
+                const row = document.createElement('div');
+                row.className = 'gantt-row';
+
+                const isPhase = task.type === 'phase';
+                const isSubTask = (task.id.toString().indexOf('.') !== -1);
+                const taskNameClass = isPhase ? 'task-phase' : (isSubTask ? 'task-sub' : '');
+                
+                let barHtml = '';
+                if(task.type !== 'milestone') {
+                    const left = ((task.start - 1) / totalWeeks) * 100;
+                    const width = (task.duration / totalWeeks) * 100;
+                    const barClass = isPhase ? 'bar-phase' : 'bar-task';
+                    barHtml = `<div class="gantt-bar ${barClass}" style="left: ${left}%; width: ${width}%;" title="${task.name} | Tjedni: ${task.start}-${task.start + task.duration - 1}"></div>`;
+                } else {
+                    const left = ((task.start - 1) / totalWeeks) * 100;
+                    barHtml = `<div class="bar-milestone" style="left: ${left}%;" title="${task.name}"><div class="milestone-tooltip">${task.name}</div></div>`;
+                }
+                
+                const timelineGrid = document.createElement('div');
+                timelineGrid.className = 'timeline-grid';
+                if(view === 'weeks'){
+                    timelineGrid.style.gridTemplateColumns = `repeat(${totalWeeks}, 1fr)`;
+                    for (let i = 0; i < totalWeeks; i++) timelineGrid.innerHTML += '<div class="timeline-grid-line"></div>';
+                } else { // months
+                    timelineGrid.style.gridTemplateColumns = months.map(m => `${m.weeks}fr`).join(' ');
+                    months.forEach(m => timelineGrid.innerHTML += '<div class="timeline-grid-line"></div>');
+                }
+
+                row.innerHTML = `
+                    <div class="gantt-task-name ${taskNameClass}">${task.name}</div>
+                    <div class="gantt-task-timeline">
+                        ${timelineGrid.outerHTML}
+                        ${barHtml}
+                    </div>
+                `;
+                ganttChart.appendChild(row);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const toggleButton = document.getElementById('view-toggle');
+            
+            toggleButton.addEventListener('click', () => {
+                currentView = (currentView === 'weeks') ? 'months' : 'weeks';
+                toggleButton.textContent = (currentView === 'weeks') ? 'Prikaži mjesečni pregled' : 'Prikaži tjedni pregled';
+                renderChart(currentView);
+            });
+
+            // Inicijalno renderiranje
+            renderChart(currentView);
+        });
+    </script>
+</body>
+</html>
